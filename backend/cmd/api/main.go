@@ -15,7 +15,8 @@ func main() {
 	e.Use(middleware.Recover())
 
 	handler := handlerDi()
-	handler.Router(e)
+	handler.EntryPoint(e)
+
 	e.Logger.Fatal(e.Start(":8080"))
 }
 
