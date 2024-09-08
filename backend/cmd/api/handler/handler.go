@@ -4,12 +4,13 @@ import (
 	"app/internal/auth"
 	"app/internal/chatgpt"
 
-	"github.com/golang-jwt/jwt/v5"
-	echojwt "github.com/labstack/echo-jwt/v4"
-	"github.com/labstack/echo/v4"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	echojwt "github.com/labstack/echo-jwt/v4"
+	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
@@ -17,7 +18,7 @@ type Handler struct {
 	authService    auth.Service
 }
 
-type accountClaims struct {
+type AccountClaims struct {
 	Id    int    `json:"id"`
 	Email string `json:"email"`
 	jwt.RegisteredClaims
@@ -49,25 +50,8 @@ func (h *Handler) Router(e *echo.Echo) {
 	e.POST("/ask", h.Ask, authMiddleware)
 }
 
-func buildAuthMiddleware() echo.MiddlewareFunc {
-	return echojwt.WithConfig(echojwt.Config{
-		NewClaimsFunc: func(c echo.Context) jwt.Claims {
-			return new(accountClaims)
-		},
-		SigningKey: []byte(os.Getenv("JWT_SECRET")),
-		SuccessHandler: func(c echo.Context) {
-			user := c.Get("user").(*jwt.Token)
-			claims := user.Claims.(*accountClaims)
-			c.Set("id", claims.Id)
-		},
-		ErrorHandler: func(c echo.Context, err error) error {
-			return c.JSON(http.StatusUnauthorized, ErrorResponse{err.Error()})
-		},
-	})
-}
-
-func GenerateJwtToken(id int, email string) (string, error) {
-	claims := &accountClaims{
+func (h *Handler) GenerateJwtToken(id int, email string) (string, error) {
+	claims := &AccountClaims{
 		Id:    id,
 		Email: email,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -82,4 +66,21 @@ func GenerateJwtToken(id int, email string) (string, error) {
 	}
 
 	return token, nil
+}
+
+func buildAuthMiddleware() echo.MiddlewareFunc {
+	return echojwt.WithConfig(echojwt.Config{
+		NewClaimsFunc: func(c echo.Context) jwt.Claims {
+			return new(AccountClaims)
+		},
+		SigningKey: []byte(os.Getenv("JWT_SECRET")),
+		SuccessHandler: func(c echo.Context) {
+			user := c.Get("user").(*jwt.Token)
+			claims := user.Claims.(*AccountClaims)
+			c.Set("id", claims.Id)
+		},
+		ErrorHandler: func(c echo.Context, err error) error {
+			return c.JSON(http.StatusUnauthorized, ErrorResponse{err.Error()})
+		},
+	})
 }
