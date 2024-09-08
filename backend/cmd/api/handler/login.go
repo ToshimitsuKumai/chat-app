@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-
 	"github.com/labstack/echo/v4"
 )
 
@@ -25,7 +24,12 @@ func (h *Handler) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{"email and password are required"})
 	}
 
-	token, err := h.authService.Login(req.Email, req.Password)
+	user, err := h.authService.Login(req.Email, req.Password)
+	if err != nil || user == nil {
+		return c.JSON(http.StatusInternalServerError, ErrorResponse{err.Error()})
+	}
+
+	token, err := GenerateJwtToken(user.Id, user.Email)
 
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{err.Error()})

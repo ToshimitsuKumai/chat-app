@@ -1,15 +1,26 @@
 package handler
 
 import (
-	"app/internal/chatgpt"
 	"app/internal/auth"
+	"app/internal/chatgpt"
 
+	"github.com/golang-jwt/jwt/v5"
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
+	"net/http"
+	"os"
+	"time"
 )
 
 type Handler struct {
 	chatgptService chatgpt.Service
 	authService    auth.Service
+}
+
+type accountClaims struct {
+	Id    int    `json:"id"`
+	Email string `json:"email"`
+	jwt.RegisteredClaims
 }
 
 type ErrorResponse struct {
@@ -26,7 +37,49 @@ func NewHandler(
 	}
 }
 
+func (h *Handler) EntryPoint(e *echo.Echo) {
+	h.Router(e)
+}
+
 func (h *Handler) Router(e *echo.Echo) {
-	e.POST("/ask", h.Ask)
+
+	authMiddleware := buildAuthMiddleware()
+
 	e.POST("/login", h.Login)
+	e.POST("/ask", h.Ask, authMiddleware)
+}
+
+func buildAuthMiddleware() echo.MiddlewareFunc {
+	return echojwt.WithConfig(echojwt.Config{
+		NewClaimsFunc: func(c echo.Context) jwt.Claims {
+			return new(accountClaims)
+		},
+		SigningKey: []byte(os.Getenv("JWT_SECRET")),
+		SuccessHandler: func(c echo.Context) {
+			user := c.Get("user").(*jwt.Token)
+			claims := user.Claims.(*accountClaims)
+			c.Set("id", claims.Id)
+		},
+		ErrorHandler: func(c echo.Context, err error) error {
+			return c.JSON(http.StatusUnauthorized, ErrorResponse{err.Error()})
+		},
+	})
+}
+
+func GenerateJwtToken(id int, email string) (string, error) {
+	claims := &accountClaims{
+		Id:    id,
+		Email: email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(2 * time.Hour)),
+		},
+	}
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	token, err := jwtToken.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
