@@ -29,7 +29,7 @@ func (h *Handler) Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{err.Error()})
 	}
 
-	token, err := GenerateJwtToken(user.Id, user.Email)
+	token, err := h.GenerateJwtToken(user.Id, user.Email)
 
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{err.Error()})
